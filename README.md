@@ -26,6 +26,8 @@ Open `http://127.0.0.1:8000`. The FastAPI server serves the browser game and API
 
 Create a run, choose a pilot (`manual`, `rule`, `random`, `laya`, or `jev`), then step one action at a time or press **Auto play**. Laya needs a local checkpoint; Jev needs a server-side `TYPESAFE_API_KEY`.
 
+For Jev, copy the root `.env.example` to `.env` and set the key there. The server loads that file; never put the key in the browser code.
+
 ```bash
 # Optional hosted Jev baseline; keep the key on the server.
 set TYPESAFE_API_KEY=your_key       # PowerShell: $env:TYPESAFE_API_KEY="your_key"
@@ -39,11 +41,11 @@ The training script runs the deterministic rule pilot across seeded maps, tests 
 
 ```bash
 pip install -e ".[train]"
-python -m training.generate_data --episodes 300 --out training/data/train.jsonl --seed 2026
-laya-train --data training/data/train.jsonl --base english --out training/checkpoints/laya-dungeon
+python ../training/generate_data.py --episodes 300 --out ../training/data/train.jsonl --seed 2026
+laya-train --data ../training/data/train.jsonl --base english --out ../training/checkpoints/laya-dungeon
 ```
 
-The generator can run without a GPU. Fine-tuning needs the upstream Laya training dependencies; GPU training is recommended. Laya's published fine-tuning guide documents `laya-train`, JSONL `state/questions/gold` records, and checkpoint loading. https://github.com/NandhaKishorM/laya/blob/main/docs/finetune.md
+The generator can run without a GPU. Fine-tuning needs the upstream Laya training dependencies; GPU training is recommended. Laya's [fine-tuning guide](https://github.com/NandhaKishorM/laya/blob/main/docs/finetune.md) documents `laya-train`, JSONL `state/questions/gold` records, and checkpoint loading.
 
 ## Benchmark
 

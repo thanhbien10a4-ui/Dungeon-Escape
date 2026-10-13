@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dungeon-escape"
+version = "0.1.0"
+description = "A reward-guided decision-model game lab"
+requires-python = ">=3.10"
+dependencies = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "httpx>=0.27", "python-dotenv>=1.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+train = ["laya>=0.3.7"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

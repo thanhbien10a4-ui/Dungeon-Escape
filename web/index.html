@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#10151d" />
+  <title>Dungeon Escape · Decision Lab</title>
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar"><div><div class="eyebrow">TACTICAL DECISION LAB</div><h1>Dungeon Escape</h1></div><div class="status-pill"><i></i><span id="connection">Connecting</span></div></header>
+    <section class="intro"><div><p>Secure the reactor core. Survive the patrols. Reach extraction.</p><small>Turn-based environment · Reward-guided Laya fine-tuning · Jev inference baseline</small></div><button id="new-game" class="primary">New run</button></section>
+    <section class="layout">
+      <article class="panel game-panel"><div class="panel-head"><div><span class="eyebrow">LIVE RUN</span><h2>Station 08</h2></div><span id="run-status" class="tag">Awaiting run</span></div>
+        <div id="board" class="board" aria-label="Dungeon grid"></div>
+        <div class="legend"><span>● You</span><span>◆ Core</span><span>⇧ Exit</span><span>✦ Enemy</span><span>＋ Supply</span></div>
+        <div class="controls"><div class="dpad"><button data-action="north">↑</button><button data-action="west">←</button><button data-action="south">↓</button><button data-action="east">→</button></div><div class="actions"><button data-action="attack">Attack</button><button data-action="heal">Heal</button><button data-action="collect_core">Secure core</button><button data-action="collect_loot">Collect</button><button data-action="extract">Extract</button></div></div>
+      </article>
+      <aside class="side-column"><section class="panel"><div class="panel-head"><div><span class="eyebrow">PILOT</span><h2>Decision model</h2></div></div><label for="pilot">Choose controller</label><select id="pilot"><option value="manual">Manual</option><option value="rule">Rule baseline</option><option value="random">Random baseline</option><option value="laya">Fine-tuned Laya</option><option value="jev">Jev API (frozen)</option></select><div class="pilot-note" id="pilot-note">Manual control. Choose a legal action below.</div><button id="auto-play" class="secondary">Auto play 10 turns</button><button id="benchmark" class="text-button">Benchmark this pilot</button></section>
+      <section class="panel metrics"><span class="eyebrow">MISSION STATE</span><div class="metric-grid"><div><small>HP</small><strong id="hp">—</strong></div><div><small>Ammo</small><strong id="ammo">—</strong></div><div><small>Medkits</small><strong id="medkits">—</strong></div><div><small>Reward</small><strong id="reward">—</strong></div><div><small>Turn</small><strong id="turn">—</strong></div><div><small>Core</small><strong id="core">—</strong></div></div><div class="decision-box"><small>LAST DECISION</small><strong id="last-decision">—</strong><span id="confidence"></span></div></section>
+      <section class="panel"><div class="panel-head"><div><span class="eyebrow">EVENT LOG</span><h2>Debrief</h2></div></div><ul id="log" class="log"><li>Start a run to inspect events.</li></ul></section>
+      </aside>
+    </section>
+    <section class="panel benchmark-panel"><div class="panel-head"><div><span class="eyebrow">EVALUATION</span><h2>Held-out seed benchmark</h2></div><span id="benchmark-label" class="tag">No results yet</span></div><div class="bench-grid"><div><small>Escape rate</small><strong id="escape-rate">—</strong></div><div><small>Mean reward</small><strong id="mean-reward">—</strong></div><div><small>Mean turns</small><strong id="mean-turns">—</strong></div><div><small>Deaths</small><strong id="deaths">—</strong></div></div><p class="footnote">A game score is only an experiment result. Use identical unseen seeds when comparing pilots.</p></section>
+    <footer>Keys stay on the server · Jev does not learn from a run · Laya training is an offline checkpoint update</footer>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

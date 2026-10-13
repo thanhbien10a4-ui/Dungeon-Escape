@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import json
+import os
+from functools import lru_cache
+from typing import Any
+
+from .game import Game, state_text
+
+ACTION_DESCRIPTIONS = {
+    "north": "Move one tile north.", "south": "Move one tile south.",
+    "west": "Move one tile west.", "east": "Move one tile east.",
+    "attack": "Spend one ammo to attack an adjacent enemy.", "heal": "Use one medkit to restore health.",
+    "collect_core": "Secure the reactor core at the objective.",
+    "collect_loot": "Collect supplies on this tile.", "extract": "Finish the mission at the extraction tile.",
+}
+
+def rule_action(game: Game) -> str:
+    legal = game.legal_actions()
+    if "extract" in legal:
+        return "extract"
+    if "collect_core" in legal:
+        return "collect_core"
+    adjacent = [e for e in game.enemies if abs(e.x-game.x) + abs(e.y-game.y) == 1]
+    if adjacent and "attack" in legal:
+        return "attack"
+    if game.hp <= 2 and "heal" in legal:
+        return "heal"
+    if "collect_loot" in legal:
+        return "collect_loot"
+    target = (1, 6) if game.has_core else (6, 1)
+    candidates = [a for a in legal if a in {"north", "south", "east", "west"}]
+    if not candidates:
+        return legal[0]
+    def dist_after(action: str) -> int:
+        dxdy = {"north": (0,-1), "south": (0,1), "west": (-1,0), "east": (1,0)}[action]
+        return abs(game.x + dxdy[0] - target[0]) + abs(game.y + dxdy[1] - target[1])
+    return min(candidates, key=dist_after)
+
+def random_action(game: Game, seed: int) -> str:
+    from random import Random
+    return Random(seed + game.turn * 997).choice(game.legal_actions())
+
+@lru_cache(maxsize=2)
+def _load_laya(checkpoint: str):
+    try:
+        import laya
+    except ImportError as exc:
+        raise RuntimeError("Install the Laya training/inference extra and set LAYA_CHECKPOINT.") from exc
+    return laya.load(checkpoint)
+
+def _questions() -> dict[str, Any]:
+    return {"action": {"type": "choice", "instructions": "Choose the best legal action for the current turn.",
+        "criteria": {name: desc for name, desc in ACTION_DESCRIPTIONS.items()}}}
+
+def choose_laya(game: Game) -> tuple[str, dict[str, Any]]:
+    checkpoint = os.getenv("LAYA_CHECKPOINT")
+    if not checkpoint:
+        raise RuntimeError("LAYA_CHECKPOINT is not set. Train or download a local Laya checkpoint first.")
+    result = _load_laya(checkpoint).predict(state_text(game), _questions())
+    answers = result.get("answers", {}) if isinstance(result, dict) else {}
+    answer = answers.get("action", {}) if isinstance(answers, dict) else {}
+    choice = answer.get("choice") if isinstance(answer, dict) else None
+    if choice not in game.legal_actions():
+        raise RuntimeError(f"Laya selected an illegal action: {choice!r}")
+    return choice, {"choice": choice, "confidence": answer.get("confidence"), "probabilities": answer.get("probabilities")}
+
+async def choose_jev(game: Game) -> tuple[str, dict[str, Any]]:
+    import httpx
+
+    api_key = os.getenv("TYPESAFE_API_KEY")
+    if not api_key:
+        raise RuntimeError("TYPESAFE_API_KEY is not set; Jev mode requires a server-side API key.")
+    legal = game.legal_actions()
+    criteria = {action: ACTION_DESCRIPTIONS[action] for action in legal}
+    payload = {"model": os.getenv("JEV_MODEL", "jev-latest"), "state": state_text(game),
+        "questions": {"action": {"type": "choice", "instructions": "Choose the best legal action for this turn, prioritizing mission completion and survival.", "criteria": criteria}}}
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post("https://api.typesafe.ai/v1/systemone", json=payload,
+                headers={"Authorization": f"Bearer {api_key}"})
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Jev request failed ({type(exc).__name__}). Check the API key, quota, and network.") from exc
+    answer = data.get("answers", {}).get("action", {})
+    choice = answer.get("choice")
+    if choice not in legal:
+        raise RuntimeError(f"Jev selected an illegal action: {choice!r}")
+    return choice, {"choice": choice, "confidence": answer.get("confidence"), "probabilities": answer.get("probabilities"), "model": data.get("model")}
+
+async def decide(game: Game, mode: str, seed: int = 0) -> tuple[str, dict[str, Any]]:
+    if mode == "rule":
+        action = rule_action(game)
+        return action, {"choice": action, "pilot": "rule"}
+    if mode == "random":
+        action = random_action(game, seed)
+        return action, {"choice": action, "pilot": "random"}
+    if mode == "laya":
+        return choose_laya(game)
+    if mode == "jev":
+        return await choose_jev(game)
+    raise ValueError(f"Unknown pilot: {mode}")
