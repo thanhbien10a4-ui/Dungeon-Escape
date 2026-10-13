@@ -5,6 +5,8 @@ import os
 from functools import lru_cache
 from typing import Any
 
+from starlette.concurrency import run_in_threadpool
+
 from .game import Game, state_text
 
 ACTION_DESCRIPTIONS = {
@@ -101,7 +103,8 @@ async def decide(game: Game, mode: str, seed: int = 0) -> tuple[str, dict[str, A
         action = random_action(game, seed)
         return action, {"choice": action, "pilot": "random"}
     if mode == "laya":
-        return choose_laya(game)
+        # Laya inference runs on CPU and is synchronous; keep it off FastAPI's event loop.
+        return await run_in_threadpool(choose_laya, game)
     if mode == "jev":
         return await choose_jev(game)
     raise ValueError(f"Unknown pilot: {mode}")
