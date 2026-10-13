@@ -49,19 +49,23 @@ def _load_laya(checkpoint: str):
         raise RuntimeError("Install the Laya training/inference extra and set LAYA_CHECKPOINT.") from exc
     return laya.load(checkpoint)
 
-def _questions() -> dict[str, Any]:
+def _questions(legal_actions: list[str]) -> dict[str, Any]:
+    criteria = {name: ACTION_DESCRIPTIONS[name] for name in legal_actions}
     return {"action": {"type": "choice", "instructions": "Choose the best legal action for the current turn.",
-        "criteria": {name: desc for name, desc in ACTION_DESCRIPTIONS.items()}}}
+        "criteria": criteria}}
 
 def choose_laya(game: Game) -> tuple[str, dict[str, Any]]:
     checkpoint = os.getenv("LAYA_CHECKPOINT")
     if not checkpoint:
         raise RuntimeError("LAYA_CHECKPOINT is not set. Train or download a local Laya checkpoint first.")
-    result = _load_laya(checkpoint).predict(state_text(game), _questions())
+    legal_actions = game.legal_actions()
+    if not legal_actions:
+        raise RuntimeError("No legal actions are available for the current game state.")
+    result = _load_laya(checkpoint).predict(state_text(game), _questions(legal_actions))
     answers = result.get("answers", {}) if isinstance(result, dict) else {}
     answer = answers.get("action", {}) if isinstance(answers, dict) else {}
     choice = answer.get("choice") if isinstance(answer, dict) else None
-    if choice not in game.legal_actions():
+    if choice not in legal_actions:
         raise RuntimeError(f"Laya selected an illegal action: {choice!r}")
     return choice, {"choice": choice, "confidence": answer.get("confidence"), "probabilities": answer.get("probabilities")}
 
