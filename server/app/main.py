@@ -32,7 +32,8 @@ class AutoRequest(BaseModel):
 class BenchmarkRequest(BaseModel):
     pilot: Literal["rule", "random", "laya", "jev"] = "rule"
     episodes: int = Field(default=10, ge=1, le=100)
-    start_seed: int = 2026
+    # Keep benchmark maps disjoint from the example training range (starting at 2026).
+    start_seed: int = 500_000
 
 @app.get("/api/health")
 async def health():
