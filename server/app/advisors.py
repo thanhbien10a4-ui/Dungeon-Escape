@@ -51,10 +51,38 @@ def _load_laya(checkpoint: str):
         raise RuntimeError("Install the Laya training/inference extra and set LAYA_CHECKPOINT.") from exc
     return laya.load(checkpoint)
 
-def _questions(legal_actions: list[str]) -> dict[str, Any]:
-    criteria = {name: ACTION_DESCRIPTIONS[name] for name in legal_actions}
-    return {"action": {"type": "choice", "instructions": "Choose the best legal action for the current turn.",
-        "criteria": criteria}}
+def _questions() -> dict[str, Any]:
+    # Laya training expects a stable question schema across examples. The
+    # current legal set is included in state_text and enforced after prediction.
+    return {"action": {"type": "choice", "instructions": "Choose only from the legal actions listed in the state.",
+        "criteria": ACTION_DESCRIPTIONS}}
+
+def _legal_laya_choice(answer: dict[str, Any], legal_actions: list[str], fallback_action: str) -> tuple[str, dict[str, Any]]:
+    raw_choice = answer.get("choice")
+    details = {"raw_choice": raw_choice, "probabilities": answer.get("probabilities")}
+    if raw_choice in legal_actions:
+        return raw_choice, details
+
+    # Constrained decoding: if the model's top choice is illegal, keep its
+    # learned ranking while masking actions that the game cannot execute.
+    probabilities = answer.get("probabilities")
+    if isinstance(probabilities, dict):
+        scored = []
+        for action in legal_actions:
+            try:
+                score = float(probabilities[action])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if score == score and abs(score) != float("inf"):
+                scored.append((score, action))
+        if scored:
+            choice = max(scored)[1]
+            details["constrained"] = True
+            return choice, details
+
+    # Some Laya backends omit probabilities. Keep the game playable and make
+    # the intervention visible to the benchmark/UI.
+    return fallback_action, {**details, "constrained": True, "fallback": "rule"}
 
 def choose_laya(game: Game) -> tuple[str, dict[str, Any]]:
     checkpoint = os.getenv("LAYA_CHECKPOINT")
@@ -63,13 +91,13 @@ def choose_laya(game: Game) -> tuple[str, dict[str, Any]]:
     legal_actions = game.legal_actions()
     if not legal_actions:
         raise RuntimeError("No legal actions are available for the current game state.")
-    result = _load_laya(checkpoint).predict(state_text(game), _questions(legal_actions))
+    result = _load_laya(checkpoint).predict(state_text(game), _questions())
     answers = result.get("answers", {}) if isinstance(result, dict) else {}
     answer = answers.get("action", {}) if isinstance(answers, dict) else {}
-    choice = answer.get("choice") if isinstance(answer, dict) else None
-    if choice not in legal_actions:
-        raise RuntimeError(f"Laya selected an illegal action: {choice!r}")
-    return choice, {"choice": choice, "confidence": answer.get("confidence"), "probabilities": answer.get("probabilities")}
+    if not isinstance(answer, dict):
+        answer = {}
+    choice, details = _legal_laya_choice(answer, legal_actions, rule_action(game))
+    return choice, {"choice": choice, "confidence": answer.get("confidence"), **details}
 
 async def choose_jev(game: Game) -> tuple[str, dict[str, Any]]:
     import httpx
