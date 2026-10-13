@@ -88,21 +88,28 @@ async def auto_play(game_id: str, payload: AutoRequest):
 
 async def run_episode(pilot: str, seed: int):
     game = Game.new(seed)
+    interventions = {"constrained_moves": 0, "rule_fallbacks": 0}
     for _ in range(80):
         if game.status != "playing":
             break
-        action, _ = await decide(game, pilot, seed)
+        action, decision = await decide(game, pilot, seed)
+        interventions["constrained_moves"] += bool(decision.get("constrained"))
+        interventions["rule_fallbacks"] += decision.get("fallback") == "rule"
         game.step(action)
-    return game
+    return game, interventions
 
 @app.post("/api/benchmark")
 async def benchmark(payload: BenchmarkRequest):
     if payload.pilot == "jev" and payload.episodes > 3:
         raise HTTPException(400, "Jev benchmark is limited to 3 episodes to control hosted API calls.")
     results = []
+    constrained_moves = 0
+    rule_fallbacks = 0
     try:
         for i in range(payload.episodes):
-            game = await run_episode(payload.pilot, payload.start_seed + i)
+            game, interventions = await run_episode(payload.pilot, payload.start_seed + i)
+            constrained_moves += interventions["constrained_moves"]
+            rule_fallbacks += interventions["rule_fallbacks"]
             results.append({"seed": game.seed, "status": game.status, "reward": round(game.reward, 2), "turns": game.turn, "hp": game.hp})
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
@@ -110,7 +117,8 @@ async def benchmark(payload: BenchmarkRequest):
     return {"pilot": payload.pilot, "episodes": len(results), "escape_rate": escaped / len(results),
         "mean_reward": round(sum(r["reward"] for r in results) / len(results), 2),
         "mean_turns": round(sum(r["turns"] for r in results) / len(results), 2),
-        "deaths": sum(r["status"] == "dead" for r in results), "results": results}
+        "deaths": sum(r["status"] == "dead" for r in results),
+        "constrained_moves": constrained_moves, "rule_fallbacks": rule_fallbacks, "results": results}
 
 if WEB_DIR.exists():
     app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
