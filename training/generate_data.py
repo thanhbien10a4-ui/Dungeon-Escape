@@ -16,7 +16,7 @@ DESCRIPTIONS = {
     "collect_core": "Secure the reactor core at the objective.", "collect_loot": "Collect supplies on this tile.", "extract": "Finish the mission at the extraction tile.",
 }
 
-def rollout_value(start: Game, first_action: str, horizon: int = 8) -> float:
+def rollout_value(start: Game, first_action: str, horizon: int = 12) -> float:
     g = Game.new(start.seed)
     g.__dict__.update({**start.__dict__, "enemies": [type(e)(e.x, e.y, e.hp) for e in start.enemies], "loot": dict(start.loot), "events": []})
     g.step(first_action)
@@ -24,10 +24,13 @@ def rollout_value(start: Game, first_action: str, horizon: int = 8) -> float:
         if g.status != "playing":
             break
         g.step(rule_action(g))
+    # Shape progress on both legs of the mission. Once the core is secured,
+    # reward getting closer to extraction instead of assigning every return
+    # position the same progress value.
     objective = (1, 6) if g.has_core else (6, 1)
     distance = abs(g.x - objective[0]) + abs(g.y - objective[1])
     survival = 3 * g.hp + 1.5 * g.ammo + 2 * g.medkits - 8 * len(g.enemies)
-    progress = 12 if g.has_core else -1.5 * distance
+    progress = 12 - 1.5 * distance if g.has_core else -1.5 * distance
     terminal = 40 if g.status == "escaped" else (-45 if g.status == "dead" else 0)
     return g.reward + survival + progress + terminal
 
