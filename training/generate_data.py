@@ -40,7 +40,9 @@ def to_case(game: Game) -> dict:
     probabilities = {action: weight / z for action, weight in zip(actions, weights)}
     return {
         "state": state_text(game),
-        "questions": {"action": {"type": "choice", "instructions": "Choose the best legal action for survival and mission completion.", "criteria": {a: DESCRIPTIONS[a] for a in actions}}},
+        # Keep the choice schema identical in every row. Legal actions remain
+        # state-specific in the state text and in the gold distribution.
+        "questions": {"action": {"type": "choice", "instructions": "Choose only from the legal actions listed in the state. Prioritize survival and mission completion.", "criteria": DESCRIPTIONS}},
         "gold": {"action": {"probabilities": probabilities}},
     }
 
