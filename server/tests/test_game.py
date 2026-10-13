@@ -1,4 +1,4 @@
-from app.advisors import random_action, rule_action
+from app.advisors import _legal_laya_choice, _questions, random_action, rule_action
 from app.game import Game
 
 
@@ -42,4 +42,28 @@ def test_rule_pilot_outperforms_random_on_fixed_seed_suite():
             wins[pilot] += game.status == "escaped"
     assert wins["rule"] >= 15
     assert wins["rule"] > wins["random"]
+
+
+def test_laya_question_schema_is_stable():
+    questions = _questions()
+    assert set(questions["action"]["criteria"]) == {
+        "north", "south", "east", "west", "attack", "heal",
+        "collect_core", "collect_loot", "extract",
+    }
+
+
+def test_laya_illegal_choice_is_masked_to_highest_scoring_legal_action():
+    choice, details = _legal_laya_choice(
+        {"choice": "attack", "probabilities": {"attack": 0.8, "east": 0.2}},
+        ["east", "north"],
+        "north",
+    )
+    assert choice == "east"
+    assert details["constrained"] is True
+
+
+def test_laya_without_probabilities_uses_visible_rule_fallback():
+    choice, details = _legal_laya_choice({"choice": "attack"}, ["east", "north"], "north")
+    assert choice == "north"
+    assert details["fallback"] == "rule"
 
