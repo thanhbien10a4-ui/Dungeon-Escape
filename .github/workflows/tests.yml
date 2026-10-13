@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e "server[dev]"
+      - run: pip install -e "./server[dev]"
       - run: pytest server/tests
       - run: python -m compileall -q server/app training
       - run: node --check web/app.js
