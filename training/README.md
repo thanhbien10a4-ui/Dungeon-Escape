@@ -1,6 +1,6 @@
 # Laya reward-guided fine-tuning
 
-The generator creates Laya JSONL cases from seeded episodes. At each sampled state it scores all legal actions by running short rollouts with the built-in rule pilot, then converts the scores to a soft probability distribution (`gold`). This creates a reproducible offline decision dataset; it is not online policy-gradient training directly against the full delayed mission reward.
+The generator creates Laya JSONL cases from seeded episodes. At each sampled state it scores all legal actions by running 12-turn rollouts with the built-in rule pilot, then converts the scores to a soft probability distribution (`gold`). The progress shaping rewards distance reduction toward the core before pickup and toward extraction after pickup. This creates a reproducible offline decision dataset; it is not online policy-gradient training directly against the full delayed mission reward.
 
 Every training row uses the same nine-action question schema. The state text and gold distribution identify which actions are legal in that state. Inference masks illegal actions using Laya's returned probabilities, so an illegal top choice cannot break a game. If Laya returns no usable probabilities for an illegal choice, the API uses the Rule pilot and marks the fallback in the decision metadata. Retrain from newly generated data after updating the code; old checkpoints were trained with the conflicting state-dependent schema.
 
